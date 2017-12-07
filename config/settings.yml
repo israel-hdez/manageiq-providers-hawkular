@@ -56,6 +56,7 @@
   :hawkular:
     :inventory_object_refresh: true
     :refresh_interval: 15.minutes
+    :allow_targeted_refresh: true
 :http_proxy:
   :hawkular:
     :host:

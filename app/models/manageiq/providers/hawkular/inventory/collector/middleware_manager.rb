@@ -29,11 +29,11 @@ module ManageIQ::Providers
     end
 
     def eaps
-      eaps = []
-      Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.each do |version|
-        eaps.concat(resources_for("WildFly Server #{version}"))
+      if target.kind_of?(ExtManagementSystem)
+        all_eaps
+      else
+        target_eaps
       end
-      eaps
     end
 
     def domain_servers
@@ -88,6 +88,20 @@ module ManageIQ::Providers
     end
 
     private
+
+    def all_eaps
+      return @eaps if @eaps
+
+      @eaps = []
+      Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.each do |version|
+        @eaps.concat(resources_for("WildFly Server #{version}"))
+      end
+      @eaps
+    end
+
+    def target_eaps
+      @eaps ||= [connection.inventory.resource(target.targets[0].manager_ref)]
+    end
 
     def resources_for(resource_type)
       connection.inventory.resources_for_type(resource_type)

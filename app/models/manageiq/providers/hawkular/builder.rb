@@ -11,6 +11,12 @@ module ManageIQ::Providers::Hawkular
           Inventory::Parser::MiddlewareDomainServers.new,
           Inventory::Parser::MiddlewareServerEntities.new
         ]
+      when ::ManagerRefresh::TargetCollection
+        collector = Inventory::Collector::MiddlewareManager.new(ems, target)
+        persister = Inventory::Persister::MiddlewareTargeted.new(ems, target)
+        parser = [
+          Inventory::Parser::MiddlewareServers.new
+        ]
       when ::ManageIQ::Providers::Hawkular::Inventory::AvailabilityUpdates
         collector = Inventory::Collector::AvailabilityUpdates.new(ems, target)
         persister = Inventory::Persister::AvailabilityUpdates.new(ems, target)
