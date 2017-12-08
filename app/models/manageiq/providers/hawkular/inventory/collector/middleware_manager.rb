@@ -29,11 +29,7 @@ module ManageIQ::Providers
     end
 
     def eaps
-      if target.kind_of?(ExtManagementSystem)
-        all_eaps
-      else
-        target_eaps
-      end
+      targeted? ? target_eaps : all_eaps
     end
 
     def domain_servers
@@ -45,19 +41,11 @@ module ManageIQ::Providers
     end
 
     def deployments
-      deployments = []
-      Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.each do |version|
-        deployments.concat(resources_for("Deployment #{version}"))
-      end
-      deployments
+      targeted? ? target_deployments : all_deployments
     end
 
     def subdeployments
-      subdeployments = []
-      Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.each do |version|
-        subdeployments.concat(resources_for("SubDeployment #{version}"))
-      end
-      subdeployments
+      targeted? ? target_subdeployments : all_subdeployments
     end
 
     def host_controllers
@@ -87,6 +75,20 @@ module ManageIQ::Providers
       nil
     end
 
+    def owning_server_for(resource_id)
+      ancestor = connection.inventory.parent(resource_id)
+
+      while ancestor && !server_types.include?(ancestor.type.id)
+        ancestor = connection.inventory.parent(resource_id)
+      end
+
+      ancestor
+    end
+
+    def targeted?
+      !target.kind_of?(ExtManagementSystem)
+    end
+
     private
 
     def all_eaps
@@ -96,11 +98,71 @@ module ManageIQ::Providers
       Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.each do |version|
         @eaps.concat(resources_for("WildFly Server #{version}"))
       end
+
       @eaps
     end
 
+    def all_deployments
+      return @deployments if @deployments
+
+      @deployments = []
+      Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.each do |version|
+        @deployments.concat(resources_for("Deployment #{version}"))
+      end
+
+      @deployments
+    end
+
+    def all_subdeployments
+      return @subdeployments if @subdeployments
+
+      @subdeployments = []
+      Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.each do |version|
+        @subdeployments.concat(resources_for("SubDeployment #{version}"))
+      end
+
+      @subdeployments
+    end
+
     def target_eaps
-      @eaps ||= [connection.inventory.resource(target.targets[0].manager_ref)]
+      @eaps ||= query_target_resources(:middleware_servers)
+    end
+
+    def target_deployments
+      supported_subdeployments = ManageIQ::Providers::Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.map do |version|
+        "Deployment #{version}"
+      end
+
+      target_deployments_subdeployments.select { |d| supported_subdeployments.include?(d.type.id) }
+    end
+
+    def target_subdeployments
+      supported_deployments = ManageIQ::Providers::Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.map do |version|
+        "SubDeployment #{version}"
+      end
+
+      target_deployments_subdeployments.select { |d| supported_deployments.include?(d.type.id) }
+    end
+
+    def target_deployments_subdeployments
+      @deployments ||= query_target_resources(:middleware_deployments)
+    end
+
+    def query_target_resources(association)
+      target.targets
+            .select { |t| t.association == association }
+            .map { |t| connection.inventory.resource(t.manager_ref) }
+    end
+
+    def server_types
+      return @server_types if @server_types
+
+      types = []
+      Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.each do |version|
+        types.concat(["Domain WildFly Server #{version}", "WildFly Server #{version}"])
+      end
+
+      @server_types = types
     end
 
     def resources_for(resource_type)

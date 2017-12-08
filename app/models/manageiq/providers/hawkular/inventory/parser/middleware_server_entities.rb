@@ -20,18 +20,32 @@ module ManageIQ::Providers::Hawkular::Inventory::Parser
     end
 
     def parse
-      fetch_server_entities
+      fetch_and_parse_server_entities
       fetch_deployment_availabilities
     end
 
     protected
 
+    def fetch_and_parse_server_entities
+      fetch_server_entities do |eap, child|
+        next unless @supported_types.include?(child.type.id)
+        parse_server_entity(eap, child)
+      end
+    end
+
     def fetch_server_entities
-      persister.middleware_servers.each do |eap|
-        eap_tree = collector.resource_tree(eap.ems_ref)
-        eap_tree.children(true).each do |child|
-          next unless @supported_types.include?(child.type.id)
-          process_server_entity(eap, child)
+      if !collector.targeted?
+        persister.middleware_servers.each do |eap|
+          eap_tree = collector.resource_tree(eap.ems_ref)
+          eap_tree.children(true).each do |child|
+            yield(eap, child)
+          end
+        end
+      else
+        %i(deployments subdeployments).each do |collection|
+          collector.public_send(collection).each do |item|
+            yield(nil, item)
+          end
         end
       end
     end
@@ -43,7 +57,7 @@ module ManageIQ::Providers::Hawkular::Inventory::Parser
       end
       subdeployments_by_deployment_id = collector.subdeployments.group_by(&:parent_id)
       subdeployments_by_deployment_id.keys.each do |parent_id|
-        deployment = collection.find_by(:ems_ref => parent_id)
+        deployment = collection.find(parent_id)
         subdeployments_by_deployment_id.fetch(parent_id).each do |collected_subdeployment|
           subdeployment = collection.find_by(:ems_ref => collected_subdeployment.id)
           subdeployment.status = deployment.status
@@ -51,7 +65,7 @@ module ManageIQ::Providers::Hawkular::Inventory::Parser
       end
     end
 
-    def process_server_entity(server, entity)
+    def parse_server_entity(server, entity)
       if @supported_deployments.include?(entity.type.id)
         inventory_object = persister.middleware_deployments.find_or_build(entity.id)
         parse_deployment(entity, inventory_object)
@@ -63,8 +77,24 @@ module ManageIQ::Providers::Hawkular::Inventory::Parser
         parse_messaging(entity, inventory_object)
       end
 
-      inventory_object.middleware_server = persister.middleware_servers.lazy_find(server.ems_ref)
-      inventory_object.middleware_server_group = server.middleware_server_group if inventory_object.respond_to?(:middleware_server_group=)
+      associate_middleware_server(server, inventory_object)
+      associate_server_group(server, inventory_object)
+    end
+
+    def associate_middleware_server(server, inventory_object)
+      if server
+        inventory_object.middleware_server = server
+      else
+        owning_server = collector.owning_server_for(inventory_object.ems_ref)
+        inventory_object.middleware_server = persister.middleware_servers.lazy_find(owning_server.id) if owning_server
+      end
+    end
+
+    def associate_server_group(server, inventory_object)
+      # TODO: Fix for targeted refresh
+      if server && inventory_object.respond_to?(:middleware_server_group=)
+        inventory_object.middleware_server_group = server.middleware_server_group
+      end
     end
 
     def parse_deployment(deployment, inventory_object)
