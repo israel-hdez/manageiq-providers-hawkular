@@ -42,7 +42,7 @@ module ManageIQ::Providers::Hawkular::Inventory::Parser
           end
         end
       else
-        %i(deployments subdeployments).each do |collection|
+        %i(datasources deployments subdeployments).each do |collection|
           collector.public_send(collection).each do |item|
             yield(nil, item)
           end

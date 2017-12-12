@@ -40,6 +40,11 @@ module ManageIQ::Providers
       domains
     end
 
+    def datasources
+      return target_datasources if targeted?
+      raise 'Not supported'
+    end
+
     def deployments
       targeted? ? target_deployments : all_deployments
     end
@@ -86,7 +91,7 @@ module ManageIQ::Providers
     end
 
     def targeted?
-      !target.kind_of?(ExtManagementSystem)
+      target.kind_of?(::ManagerRefresh::TargetCollection)
     end
 
     private
@@ -128,6 +133,10 @@ module ManageIQ::Providers
       @eaps ||= query_target_resources(:middleware_servers)
     end
 
+    def target_datasources
+      @datasources ||= query_target_resources(:middleware_datasources)
+    end
+
     def target_deployments
       supported_subdeployments = ManageIQ::Providers::Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.map do |version|
         "Deployment #{version}"
@@ -152,6 +161,7 @@ module ManageIQ::Providers
       target.targets
             .select { |t| t.association == association }
             .map { |t| connection.inventory.resource(t.manager_ref) }
+            .compact
     end
 
     def server_types

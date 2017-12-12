@@ -7,6 +7,7 @@ module ManageIQ::Providers
 
     def initialize_inventory_collections
       add_servers_collection
+      add_datasources_collection
       add_deployments_collection
     end
 
@@ -21,6 +22,18 @@ module ManageIQ::Providers
         :association                 => :middleware_servers,
         :inventory_object_attributes => %i(type type_path hostname product lives_on_id lives_on_type
                                            middleware_server_group).concat(COMMON_ATTRIBUTES),
+        :builder_params              => { :ext_management_system => ->(persister) { persister.manager } }
+      )
+    end
+
+    def add_datasources_collection
+      add_inventory_collection(
+        :model_class                 => self.class.provider_module::MiddlewareManager::MiddlewareDatasource,
+        :targeted                    => true,
+        :manager_uuids               => touched_refs(:middleware_datasources),
+        :strategy                    => :local_db_find_missing_references,
+        :association                 => :middleware_datasources,
+        :inventory_object_attributes => %i(middleware_server).concat(COMMON_ATTRIBUTES),
         :builder_params              => { :ext_management_system => ->(persister) { persister.manager } }
       )
     end
