@@ -53,6 +53,11 @@ module ManageIQ::Providers
       targeted? ? target_subdeployments : all_subdeployments
     end
 
+    def messagings
+      return target_messagings if targeted?
+      raise 'Not supported'
+    end
+
     def host_controllers
       host_controllers = []
       Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.each do |version|
@@ -84,7 +89,7 @@ module ManageIQ::Providers
       ancestor = connection.inventory.parent(resource_id)
 
       while ancestor && !server_types.include?(ancestor.type.id)
-        ancestor = connection.inventory.parent(resource_id)
+        ancestor = connection.inventory.parent(ancestor.id)
       end
 
       ancestor
@@ -155,6 +160,10 @@ module ManageIQ::Providers
 
     def target_deployments_subdeployments
       @deployments ||= query_target_resources(:middleware_deployments)
+    end
+
+    def target_messagings
+      @messagings ||= query_target_resources(:middleware_messagings)
     end
 
     def query_target_resources(association)

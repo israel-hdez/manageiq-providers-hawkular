@@ -17,7 +17,7 @@ module ManageIQ::Providers::Hawkular
         parser = []
         parser << Inventory::Parser::MiddlewareServers.new if target.targets.any? { |t| t.association == :middleware_servers }
         parser << Inventory::Parser::MiddlewareServerEntities.new if target.targets.any? do |t|
-          %i(middleware_datasources middleware_deployments).any? { |e| e == t.association }
+          %i(middleware_datasources middleware_deployments middleware_messagings).any? { |e| e == t.association }
         end
       when ::ManageIQ::Providers::Hawkular::Inventory::AvailabilityUpdates
         collector = Inventory::Collector::AvailabilityUpdates.new(ems, target)

@@ -9,6 +9,7 @@ module ManageIQ::Providers
       add_servers_collection
       add_datasources_collection
       add_deployments_collection
+      add_messagings_collection
     end
 
     private
@@ -46,6 +47,18 @@ module ManageIQ::Providers
         :strategy                    => :local_db_find_missing_references,
         :association                 => :middleware_deployments,
         :inventory_object_attributes => %i(middleware_server middleware_server_group status).concat(COMMON_ATTRIBUTES),
+        :builder_params              => { :ext_management_system => ->(persister) { persister.manager } }
+      )
+    end
+
+    def add_messagings_collection
+      add_inventory_collection(
+        :model_class                 => self.class.provider_module::MiddlewareManager::MiddlewareMessaging,
+        :targeted                    => true,
+        :manager_uuids               => touched_refs(:middleware_messagings),
+        :strategy                    => :local_db_find_missing_references,
+        :association                 => :middleware_messagings,
+        :inventory_object_attributes => %i(middleware_server messaging_type).concat(COMMON_ATTRIBUTES),
         :builder_params              => { :ext_management_system => ->(persister) { persister.manager } }
       )
     end
