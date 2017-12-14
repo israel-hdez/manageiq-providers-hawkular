@@ -59,19 +59,11 @@ module ManageIQ::Providers
     end
 
     def host_controllers
-      host_controllers = []
-      Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.each do |version|
-        host_controllers.concat(resources_for("Host Controller #{version}"))
-      end
-      host_controllers
+      targeted? ? target_host_controllers : all_host_controllers
     end
 
     def domains
-      domains = []
-      Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.each do |version|
-        domains.concat(resources_for("Domain Host #{version}"))
-      end
-      domains
+      targeted? ? target_domains : all_domains
     end
 
     def child_resources(resource_id, recursive = false)
@@ -134,6 +126,28 @@ module ManageIQ::Providers
       @subdeployments
     end
 
+    def all_host_controllers
+      return @host_controllers if @host_controllers
+
+      @host_controllers = []
+      Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.each do |version|
+        @host_controllers.concat(resources_for("Host Controller #{version}"))
+      end
+
+      @host_controllers
+    end
+
+    def all_domains
+      return @domains if @domains
+
+      @domains = []
+      Hawkular::MiddlewareManager::SUPPORTED_VERSIONS.each do |version|
+        @domains.concat(resources_for("Domain Host #{version}"))
+      end
+
+      @domains
+    end
+
     def target_eaps
       @eaps ||= query_target_resources(:middleware_servers)
     end
@@ -160,6 +174,16 @@ module ManageIQ::Providers
 
     def target_deployments_subdeployments
       @deployments ||= query_target_resources(:middleware_deployments)
+    end
+
+    def target_host_controllers
+      target_domains.map(&:parent_id)
+                    .uniq
+                    .map { |host_id| connection.inventory.resource(host_id) }
+    end
+
+    def target_domains
+      @domains ||= query_target_resources(:middleware_domains)
     end
 
     def target_messagings

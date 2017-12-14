@@ -6,6 +6,8 @@ module ManageIQ::Providers
     delegate :targets, :to => :target_collection
 
     def initialize_inventory_collections
+      add_domains_collection
+      add_server_groups_collection
       add_servers_collection
       add_datasources_collection
       add_deployments_collection
@@ -13,6 +15,34 @@ module ManageIQ::Providers
     end
 
     private
+
+    def add_domains_collection
+      add_inventory_collection(
+        :model_class                 => self.class.provider_module::MiddlewareManager::MiddlewareDomain,
+        :targeted                    => true,
+        :manager_uuids               => touched_refs(:middleware_domains),
+        :strategy                    => :local_db_find_missing_references,
+        :association                 => :middleware_domains,
+        :inventory_object_attributes => %i(type_path).concat(COMMON_ATTRIBUTES),
+        :builder_params              => { :ext_management_system => ->(persister) { persister.manager } }
+      )
+    end
+
+    def add_server_groups_collection
+      add_inventory_collection(
+        :model_class                  => self.class.provider_module::MiddlewareManager::MiddlewareServerGroup,
+        :targeted                     => true,
+        :targeted_arel                => lambda do |collection|
+          manager_uuids = collection.parent_inventory_collections
+                                    .each_with_object(Set.new) { |parent, obj| obj.merge(parent.manager_uuids) }
+                                    .to_a
+          collection.full_collection_for_comparison.where(:middleware_domains => { :ems_ref => manager_uuids })
+        end,
+        :association                  => :middleware_server_groups,
+        :parent_inventory_collections => [:middleware_domains],
+        :inventory_object_attributes  => %i(type_path profile middleware_domain).concat(COMMON_ATTRIBUTES)
+      )
+    end
 
     def add_servers_collection
       add_inventory_collection(
