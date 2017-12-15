@@ -76,10 +76,6 @@ module ManageIQ::Providers
       domains
     end
 
-    def child_resources(resource_id, recursive = false)
-      manager.child_resources(resource_id, recursive)
-    end
-
     def raw_availability_data(metrics, time)
       connection.prometheus.query(:metrics => metrics, :time => time)
     rescue => err
