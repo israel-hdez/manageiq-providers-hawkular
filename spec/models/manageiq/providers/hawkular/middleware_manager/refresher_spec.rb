@@ -19,12 +19,12 @@ describe ManageIQ::Providers::Hawkular::MiddlewareManager::Refresher do
   it "will perform a full refresh on localhost" do
     VCR.use_cassette(described_class.name.underscore.to_s,
                      :allow_unused_http_interactions => true,
+                     :match_requests_on              => [:method, VCR.request_matchers.uri_without_params(:start)],
                      :decode_compressed_response     => true) do # , :record => :new_episodes) do
       EmsRefresh.refresh(@ems_hawkular)
     end
 
     @ems_hawkular.reload
-
     expect(@ems_hawkular.middleware_domains).not_to be_empty
     domain = @ems_hawkular.middleware_domains.first
     expect(domain.middleware_server_groups).not_to be_empty
@@ -39,9 +39,10 @@ describe ManageIQ::Providers::Hawkular::MiddlewareManager::Refresher do
     expect(@ems_hawkular.middleware_datasources).not_to be_empty
     expect(@ems_hawkular.middleware_messagings).not_to be_empty
     expect(@ems_hawkular.middleware_deployments.first.status).to eq('Enabled')
+    # See https://github.com/hawkular/hawkular-services/pull/258
     expect(@ems_hawkular.middleware_servers.first.properties).to include(
-      'Availability'            => 'up',
-      'Calculated Server State' => 'running'
+      'Availability'            => 'Running',
+      'Calculated Server State' => 'reload-required'
     )
     assert_specific_datasource(@ems_hawkular, "#{the_feed_id}~Local DMR~/subsystem=datasources/data-source=ExampleDS")
     assert_specific_datasource(@ems_hawkular,
@@ -100,6 +101,7 @@ describe ManageIQ::Providers::Hawkular::MiddlewareManager::Refresher do
     VCR.use_cassette(described_class.name.underscore.to_s + '_without_os',
                      :allow_unused_http_interactions => true,
                      :decode_compressed_response     => true,
+                     :match_requests_on              => [:method, VCR.request_matchers.uri_without_params(:start)],
                      :record                         => :none) do
       EmsRefresh.refresh(@ems_hawkular2)
     end
